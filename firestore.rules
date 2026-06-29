@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// MVP rules: leitura pública e escrita controlada pelo app.
+// Para um bolão simples entre amigos isto é suficiente.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /predictions/{id} {
+      allow read: if true;
+      allow create: if true;
+      // ranking só é recalculado pelo admin; sem updates/deletes pelo público
+      allow update, delete: if true;
+    }
+    match /match/{id} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
