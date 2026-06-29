@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Trophy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Countdown } from "@/components/Countdown";
+import { flagUrl } from "@/lib/flags";
 import type { Match } from "@/types";
 
 function formatKickoff(iso: string) {
@@ -33,7 +34,7 @@ export function MatchCard({ match }: { match: Match }) {
           </div>
 
           <div className="mt-6 flex items-center justify-center gap-4 md:gap-8">
-            <Team name={match.teamHome} flag="🇧🇷" />
+            <Team name={match.teamHome} />
             <div className="flex flex-col items-center">
               {finished ? (
                 <span className="text-4xl font-black tabular-nums md:text-5xl">
@@ -46,7 +47,7 @@ export function MatchCard({ match }: { match: Match }) {
                 </span>
               )}
             </div>
-            <Team name={match.teamAway} flag="🌎" />
+            <Team name={match.teamAway} />
           </div>
 
           <p className="mt-6 text-center text-sm capitalize text-white/80">
@@ -68,10 +69,20 @@ export function MatchCard({ match }: { match: Match }) {
   );
 }
 
-function Team({ name, flag }: { name: string; flag: string }) {
+function Team({ name }: { name: string }) {
+  const url = flagUrl(name);
   return (
     <div className="flex flex-1 flex-col items-center gap-2">
-      <span className="text-4xl md:text-5xl">{flag}</span>
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt={name}
+          className="h-10 w-auto rounded-md shadow-md ring-1 ring-white/20 md:h-12"
+        />
+      ) : (
+        <span className="text-4xl md:text-5xl">🌎</span>
+      )}
       <span className="text-center text-lg font-bold leading-tight md:text-xl">
         {name}
       </span>
