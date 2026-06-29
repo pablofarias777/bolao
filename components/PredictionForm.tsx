@@ -3,18 +3,20 @@
 import { useState } from "react";
 import confetti from "canvas-confetti";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Lock, Send } from "lucide-react";
+import { CheckCircle2, Loader2, Lock, Pencil, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { addPrediction } from "@/services/predictions";
-import type { Match } from "@/types";
+import { addPrediction, updatePrediction } from "@/services/predictions";
+import type { Match, Prediction } from "@/types";
+
+const CLOSE_BEFORE_MS = 30 * 60 * 1000;
 
 interface Props {
   match: Match;
   name: string;
-  hasPredicted: boolean;
-  onPredicted: (id: string) => void;
+  prediction: Prediction | null;
+  onSaved: (prediction: Prediction) => void;
 }
 
 function fireConfetti() {
@@ -44,28 +46,34 @@ function fireConfetti() {
   );
 }
 
-export function PredictionForm({ match, name, hasPredicted, onPredicted }: Props) {
-  const [home, setHome] = useState("");
-  const [away, setAway] = useState("");
+export function PredictionForm({ match, name, prediction, onSaved }: Props) {
+  const [home, setHome] = useState(
+    prediction ? String(prediction.scoreBrazil) : ""
+  );
+  const [away, setAway] = useState(
+    prediction ? String(prediction.scoreOpponent) : ""
+  );
   const [submitting, setSubmitting] = useState(false);
+  const [editing, setEditing] = useState(false);
 
-  const closed = match.status !== "scheduled" || Date.now() >= new Date(match.startTime).getTime();
+  const deadline = new Date(match.startTime).getTime() - CLOSE_BEFORE_MS;
+  const closed = match.status !== "scheduled" || Date.now() >= deadline;
 
-  if (closed && !hasPredicted) {
+  if (closed && !prediction) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
           <Lock className="size-10 text-muted-foreground" />
           <p className="text-lg font-semibold">Palpites encerrados</p>
           <p className="text-sm text-muted-foreground">
-            O jogo já começou. Acompanhe o ranking abaixo.
+            O prazo terminou. Acompanhe o ranking abaixo.
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  if (hasPredicted) {
+  if (prediction && !editing) {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
@@ -77,9 +85,30 @@ export function PredictionForm({ match, name, hasPredicted, onPredicted }: Props
             <p className="text-lg font-semibold">
               Seu palpite foi registrado com sucesso.
             </p>
-            <p className="text-sm text-muted-foreground">
-              Boa sorte, {name}! Não é possível alterar depois de enviar.
+            <p className="text-3xl font-black tabular-nums">
+              {prediction.scoreBrazil}{" "}
+              <span className="text-muted-foreground">x</span>{" "}
+              {prediction.scoreOpponent}
             </p>
+            {closed ? (
+              <p className="text-sm text-muted-foreground">
+                Palpites encerrados — não é mais possível alterar. Boa sorte,{" "}
+                {name}!
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Você pode alterar até 30 min antes do jogo.
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => setEditing(true)}
+                >
+                  <Pencil /> Alterar palpite
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -91,20 +120,32 @@ export function PredictionForm({ match, name, hasPredicted, onPredicted }: Props
       toast.error("Preencha o placar.");
       return;
     }
+    const scoreBrazil = home === "" ? 0 : Number(home);
+    const scoreOpponent = away === "" ? 0 : Number(away);
     setSubmitting(true);
     try {
-      const id = await addPrediction({
-        name,
-        scoreBrazil: home === "" ? 0 : Number(home),
-        scoreOpponent: away === "" ? 0 : Number(away),
-      });
-      fireConfetti();
-      toast.success("Palpite enviado!", {
-        description: "Seu palpite foi registrado com sucesso.",
-      });
-      onPredicted(id);
+      if (prediction) {
+        await updatePrediction(prediction.id, { scoreBrazil, scoreOpponent });
+        toast.success("Palpite atualizado!");
+        onSaved({ ...prediction, scoreBrazil, scoreOpponent });
+        setEditing(false);
+      } else {
+        const id = await addPrediction({ name, scoreBrazil, scoreOpponent });
+        fireConfetti();
+        toast.success("Palpite enviado!", {
+          description: "Seu palpite foi registrado com sucesso.",
+        });
+        onSaved({
+          id,
+          name,
+          scoreBrazil,
+          scoreOpponent,
+          createdAt: Date.now(),
+          points: 0,
+        });
+      }
     } catch {
-      toast.error("Não foi possível enviar. Tente novamente.");
+      toast.error("Não foi possível salvar. Tente novamente.");
     } finally {
       setSubmitting(false);
     }
@@ -113,7 +154,9 @@ export function PredictionForm({ match, name, hasPredicted, onPredicted }: Props
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-center">Faça seu palpite</CardTitle>
+        <CardTitle className="text-center">
+          {prediction ? "Alterar palpite" : "Faça seu palpite"}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-8">
         <div className="flex items-end justify-center gap-4">
@@ -124,23 +167,40 @@ export function PredictionForm({ match, name, hasPredicted, onPredicted }: Props
           <ScoreInput label={match.teamAway} value={away} onChange={setAway} />
         </div>
 
-        <Button
-          variant="success"
-          size="lg"
-          className="w-full"
-          disabled={submitting}
-          onClick={handleSubmit}
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="animate-spin" /> Enviando...
-            </>
-          ) : (
-            <>
-              <Send /> Enviar Palpite
-            </>
+        <div className="space-y-2">
+          <Button
+            variant="success"
+            size="lg"
+            className="w-full"
+            disabled={submitting}
+            onClick={handleSubmit}
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="animate-spin" /> Salvando...
+              </>
+            ) : (
+              <>
+                <Send /> {prediction ? "Salvar alteração" : "Enviar Palpite"}
+              </>
+            )}
+          </Button>
+
+          {prediction && (
+            <Button
+              variant="ghost"
+              className="w-full"
+              disabled={submitting}
+              onClick={() => {
+                setHome(String(prediction.scoreBrazil));
+                setAway(String(prediction.scoreOpponent));
+                setEditing(false);
+              }}
+            >
+              <X /> Cancelar
+            </Button>
           )}
-        </Button>
+        </div>
       </CardContent>
     </Card>
   );

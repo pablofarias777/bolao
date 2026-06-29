@@ -8,14 +8,15 @@ import { MatchCard } from "@/components/MatchCard";
 import { PredictionForm } from "@/components/PredictionForm";
 import { Leaderboard } from "@/components/Leaderboard";
 import { useMatch } from "@/hooks/useMatch";
+import type { Prediction } from "@/types";
 
-const PREDICTION_KEY = "bolao:predictionId";
+const PREDICTION_KEY = "bolao:prediction";
 
 export default function PlayPage() {
   const router = useRouter();
   const { match } = useMatch();
   const [name, setName] = useState<string | null>(null);
-  const [predictionId, setPredictionId] = useState<string | null>(null);
+  const [prediction, setPrediction] = useState<Prediction | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("bolao:name");
@@ -24,12 +25,20 @@ export default function PlayPage() {
       return;
     }
     setName(stored);
-    setPredictionId(localStorage.getItem(PREDICTION_KEY));
+
+    const raw = localStorage.getItem(PREDICTION_KEY);
+    if (raw) {
+      try {
+        setPrediction(JSON.parse(raw) as Prediction);
+      } catch {
+        localStorage.removeItem(PREDICTION_KEY);
+      }
+    }
   }, [router]);
 
-  function handlePredicted(id: string) {
-    localStorage.setItem(PREDICTION_KEY, id);
-    setPredictionId(id);
+  function handleSaved(saved: Prediction) {
+    localStorage.setItem(PREDICTION_KEY, JSON.stringify(saved));
+    setPrediction(saved);
   }
 
   if (!name) return null;
@@ -42,10 +51,10 @@ export default function PlayPage() {
         <PredictionForm
           match={match}
           name={name}
-          hasPredicted={!!predictionId}
-          onPredicted={handlePredicted}
+          prediction={prediction}
+          onSaved={handleSaved}
         />
-        <Leaderboard highlightId={predictionId} />
+        <Leaderboard highlightId={prediction?.id ?? null} />
       </main>
       <Footer />
     </div>

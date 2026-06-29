@@ -1,9 +1,11 @@
 import {
   addDoc,
   collection,
+  doc,
   onSnapshot,
   orderBy,
   query,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Prediction } from "@/types";
@@ -23,6 +25,13 @@ export async function addPrediction(input: NewPrediction): Promise<string> {
     points: 0,
   });
   return docRef.id;
+}
+
+export async function updatePrediction(
+  id: string,
+  input: Omit<NewPrediction, "name">
+): Promise<void> {
+  await updateDoc(doc(db, "predictions", id), input);
 }
 
 export function subscribePredictions(
