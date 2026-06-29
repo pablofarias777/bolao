@@ -51,13 +51,16 @@ export function AdminPanel() {
   }
 
   async function handleSaveResult() {
-    if (resultHome === "" || resultAway === "") {
+    if (resultHome === "" && resultAway === "") {
       toast.error("Informe o placar final.");
       return;
     }
     setSavingResult(true);
     try {
-      await updateResult(Number(resultHome), Number(resultAway));
+      await updateResult(
+        resultHome === "" ? 0 : Number(resultHome),
+        resultAway === "" ? 0 : Number(resultAway)
+      );
       toast.success("Resultado salvo e ranking recalculado!");
     } catch {
       toast.error("Erro ao salvar o resultado.");

@@ -87,16 +87,16 @@ export function PredictionForm({ match, name, hasPredicted, onPredicted }: Props
   }
 
   async function handleSubmit() {
-    if (home === "" || away === "") {
-      toast.error("Preencha os dois placares.");
+    if (home === "" && away === "") {
+      toast.error("Preencha o placar.");
       return;
     }
     setSubmitting(true);
     try {
       const id = await addPrediction({
         name,
-        scoreBrazil: Number(home),
-        scoreOpponent: Number(away),
+        scoreBrazil: home === "" ? 0 : Number(home),
+        scoreOpponent: away === "" ? 0 : Number(away),
       });
       fireConfetti();
       toast.success("Palpite enviado!", {
